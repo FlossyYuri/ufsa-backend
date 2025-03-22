@@ -127,6 +127,96 @@ Example Response:
 }
 ```
 
+### Get Dashboard Statistics
+```http
+GET /api/stats/dashboard
+```
+
+Returns comprehensive statistics and analytics about tenders and direct adjustments.
+
+Example Response:
+```json
+{
+  "primary_metrics": {
+    "total_open_tenders": 100,
+    "total_awarded_tenders": 50,
+    "total_direct_adjustments": 75,
+    "total_direct_adjustments_value": 15000000.00,
+    "growth_rates": {
+      "open_tenders": 25.5,
+      "awarded_tenders": 10.2,
+      "direct_adjustments": -5.3
+    }
+  },
+  "secondary_metrics": {
+    "unique_entities": 45,
+    "unique_provinces": 11,
+    "average_direct_adjustment_value": 200000.00,
+    "average_days_until_opening": 15
+  },
+  "distribution_metrics": {
+    "province_distribution": {
+      "Maputo": {
+        "count": 30,
+        "percentage": 30.0
+      }
+    },
+    "tender_type_distribution": {
+      "Concurso Público": {
+        "count": 50,
+        "percentage": 50.0
+      }
+    },
+    "value_distribution": {
+      "0-100k": 20,
+      "100k-500k": 30,
+      "500k-1M": 15,
+      "1M-5M": 8,
+      "5M+": 2
+    }
+  },
+  "time_based_analytics": {
+    "monthly_trends": [
+      {
+        "month": "2025-03",
+        "open_tenders": 35,
+        "awarded_tenders": 20,
+        "direct_adjustments": 25
+      }
+    ]
+  },
+  "entity_analytics": {
+    "top_entities": [
+      {
+        "entity": "Ministério da Educação",
+        "count": 25
+      }
+    ]
+  },
+  "recent_activity": {
+    "recent_awards": [
+      {
+        "referencia": "27A001141/CP/001/2025",
+        "objeto": "Fornecimento de Material de Escritório",
+        "data_adjudicacao": "2025-03-15"
+      }
+    ]
+  },
+  "period_comparisons": {
+    "current_month": {
+      "open": 35,
+      "awarded": 20,
+      "direct": 25
+    },
+    "previous_month": {
+      "open": 28,
+      "awarded": 18,
+      "direct": 27
+    }
+  }
+}
+```
+
 ### Get Available Provinces
 ```http
 GET /api/concursos/provincias
