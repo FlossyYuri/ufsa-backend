@@ -29,7 +29,7 @@ function calculateMonthlyTrends(data, months = 6) {
 
 function calculateGrowthRate(current, previous) {
   if (previous === 0) return current > 0 ? 100 : 0;
-  return ((current - previous) / previous) * 100;
+  return Math.round(((current - previous) / previous) * 100);
 }
 
 function calculateValueDistribution(adjustments) {
@@ -61,11 +61,11 @@ function calculateProvinceDistribution(tenders) {
     distribution[tender.provincia] = (distribution[tender.provincia] || 0) + 1;
   });
 
-  // Convert to percentages
+  // Convert to percentages and round
   Object.keys(distribution).forEach(province => {
     distribution[province] = {
       count: distribution[province],
-      percentage: (distribution[province] / total) * 100
+      percentage: Math.round((distribution[province] / total) * 100)
     };
   });
 
@@ -80,11 +80,11 @@ function calculateTenderTypeDistribution(tenders) {
     distribution[tender.tipo_concurso] = (distribution[tender.tipo_concurso] || 0) + 1;
   });
 
-  // Convert to percentages
+  // Convert to percentages and round
   Object.keys(distribution).forEach(type => {
     distribution[type] = {
       count: distribution[type],
-      percentage: (distribution[type] / total) * 100
+      percentage: Math.round((distribution[type] / total) * 100)
     };
   });
 
@@ -159,10 +159,10 @@ export function calculateDashboardStats(data) {
     ).length
   };
 
-  // Calculate total value of direct adjustments
-  const totalDirectAdjustmentsValue = data.ajustes_diretos.reduce((sum, adj) => sum + adj.valor, 0);
+  // Calculate total value of direct adjustments and round
+  const totalDirectAdjustmentsValue = Math.round(data.ajustes_diretos.reduce((sum, adj) => sum + adj.valor, 0));
   const averageDirectAdjustmentValue = data.ajustes_diretos.length > 0 ? 
-    totalDirectAdjustmentsValue / data.ajustes_diretos.length : 0;
+    Math.round(totalDirectAdjustmentsValue / data.ajustes_diretos.length) : 0;
 
   return {
     primary_metrics: {
