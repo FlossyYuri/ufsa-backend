@@ -32,11 +32,11 @@ async function checkUfsaAvailability() {
 export async function initializeCache() {
   try {
     // Always try to load saved data first as a fallback
-    const savedData = loadData();
+    const savedData = await loadData();
     if (savedData) {
       cache = {
         tenders: savedData,
-        lastUpdate: getLastUpdateDate(),
+        lastUpdate: await getLastUpdateDate(),
         retryAttempts: 0,
         isUsingPersistedData: true
       };
@@ -55,7 +55,7 @@ export async function initializeCache() {
       // If fresh fetch fails but we have saved data, use it
       cache = {
         tenders: savedData,
-        lastUpdate: getLastUpdateDate(),
+        lastUpdate: await getLastUpdateDate(),
         retryAttempts: 0,
         isUsingPersistedData: true
       };
@@ -74,11 +74,11 @@ async function updateCache() {
     
     if (!isUfsaAvailable) {
       console.log('UFSA website is not available, using persisted data');
-      const savedData = loadData();
+      const savedData = await loadData();
       if (savedData) {
         cache = {
           tenders: savedData,
-          lastUpdate: getLastUpdateDate(),
+          lastUpdate: await getLastUpdateDate(),
           retryAttempts: cache.retryAttempts + 1,
           isUsingPersistedData: true
         };
@@ -109,11 +109,11 @@ async function updateCache() {
     console.error('Failed to update cache:', error);
     
     // Load saved data as fallback if available
-    const savedData = loadData();
+    const savedData = await loadData();
     if (savedData) {
       cache = {
         tenders: savedData,
-        lastUpdate: getLastUpdateDate(),
+        lastUpdate: await getLastUpdateDate(),
         retryAttempts: cache.retryAttempts + 1,
         isUsingPersistedData: true
       };

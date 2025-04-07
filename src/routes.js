@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { getCache } from './services/cache.js';
 import { createObjectCsvWriter } from 'csv-writer';
 import { calculateDashboardStats } from './services/statistics.js';
+import { fetchTenderDetails } from './services/scraper.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -23,9 +24,40 @@ export function setupRoutes(app) {
         '/api/concursos/entidades': 'List all contracting entities',
         '/api/concursos/export': 'Export tenders in CSV or JSON format',
         '/api/stats/dashboard': 'Get dashboard statistics',
+        '/api/concursos/detalhes?referencia=1': 'Get detailed information for a specific tender (use ?referencia=value)',
         '/api/status': 'Check API status'
       }
     });
+  });
+
+  // Get tender details
+  router.get('/api/concursos/detalhes', async (req, res) => {
+    try {
+      const { referencia } = req.query;
+      if (!referencia) {
+        return res.status(400).json({
+          error: 'Bad Request',
+          message: 'Tender reference is required as a query parameter'
+        });
+      }
+
+      const details = await fetchTenderDetails(referencia);
+      
+      if (!details) {
+        return res.status(404).json({
+          error: 'Not Found',
+          message: 'Tender details not found'
+        });
+      }
+
+      res.json(details);
+    } catch (error) {
+      console.error('Error fetching tender details:', error);
+      res.status(500).json({
+        error: 'Internal Server Error',
+        message: process.env.NODE_ENV === 'development' ? error.message : 'Failed to fetch tender details'
+      });
+    }
   });
 
   // Dashboard Statistics

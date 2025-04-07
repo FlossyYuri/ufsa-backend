@@ -1,6 +1,7 @@
 import axios from 'axios';
 import axiosRetry from 'axios-retry';
 import * as cheerio from 'cheerio';
+import { backOff } from 'exponential-backoff';
 
 const BASE_URL = 'https://www.ufsa.gov.mz';
 const ENDPOINTS = {
@@ -18,11 +19,7 @@ const DETAIL_ENDPOINTS = {
 // Browser-like headers
 const headers = {
   'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-  'Accept-Language': 'en-US,en;q=0.5',
   'Connection': 'keep-alive',
-  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-  'Upgrade-Insecure-Requests': '1',
-  'Cache-Control': 'max-age=0'
 };
 
 // Configure axios with enhanced retry logic
@@ -39,10 +36,12 @@ axiosRetry(client, {
     return delay + randomization;
   },
   retryCondition: (error) => {
+    // Add 523 to the list of retryable status codes
     return (
       axiosRetry.isNetworkOrIdempotentRequestError(error) ||
       error.response?.status >= 500 ||
       error.response?.status === 429 ||
+      error.response?.status === 523 ||
       error.response?.status === 530 ||
       error.response?.status === 404
     );
@@ -52,26 +51,76 @@ axiosRetry(client, {
 // Add delay between requests
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-async function fetchPage(url) {
+async function fetchWithBackoff(url) {
+  return backOff(
+    async () => {
+      try {
+        // Random delay between 2-5 seconds
+        await delay(2000 + Math.random() * 3000);
+        
+        const response = await client.get(url);
+        return cheerio.load(response.data);
+      } catch (error) {
+        console.error(`Error fetching page ${url}:`, {
+          message: error.message,
+          status: error.response?.status,
+          statusText: error.response?.statusText
+        });
+        
+        // If we get a 523, throw a specific error
+        if (error.response?.status === 523) {
+          throw new Error('Origin server unreachable (523)');
+        }
+        throw error;
+      }
+    },
+    {
+      numOfAttempts: 5,
+      startingDelay: 1000,
+      timeMultiple: 2,
+      maxDelay: 30000,
+      jitter: true
+    }
+  );
+}
+
+export async function fetchTenderDetails(referencia) {
   try {
-    // Random delay between 2-5 seconds
-    await delay(2000 + Math.random() * 3000);
-    
-    const response = await client.get(url);
-    return cheerio.load(response.data);
-  } catch (error) {
-    console.error(`Error fetching page ${url}:`, {
-      message: error.message,
-      status: error.response?.status,
-      statusText: error.response?.statusText
+    const url = `${BASE_URL}/concurso_detalhes.php?referencia=${encodeURIComponent(referencia)}`;
+    const $ = await fetchWithBackoff(url);
+
+    const details = {};
+    $('#lista tbody tr').each((i, element) => {
+      const key = $(element).find('th:first').text().trim();
+
+      const value = $(element).find('th:last-child, td:last-child').text().trim();
+      if (/valor|garantia/.test(key) && !isNaN(value.replace(/[^\d.-]/g, ''))) {
+        details[key] = parseFloat(value.replace(/[^\d.-]/g, ''));
+      } else if (key === 'numero_de_lotes' && !isNaN(value)) {
+        details[key] = parseInt(value);
+      } else {
+        details[key] = value;
+      }
     });
+    $('#lista2 tbody tr').each((i, element) => {
+      const link1 = $(element).find('td:first a').attr('href');
+      details["Ficheiro do Anuncio"] = "https://www.ufsa.gov.mz/" + link1
+
+      const link2 = $(element).find('td:last-child a').attr('href');
+      details["Documento do Concurso"] = "https://www.ufsa.gov.mz/" + link2
+    });
+
+    console.log(details);
+    return details;
+  } catch (error) {
+    console.error('Error fetching tender details:', error);
     throw error;
   }
 }
 
 async function fetchConcursos() {
   try {
-    const $ = await fetchPage(`${BASE_URL}${ENDPOINTS.concursos}`);
+    const $ = await fetchWithBackoff(`${BASE_URL}${ENDPOINTS.concursos}`);
     const concursos = [];
     
     $('table tbody tr').each((i, element) => {
@@ -94,13 +143,13 @@ async function fetchConcursos() {
     return concursos;
   } catch (error) {
     console.error('Error fetching concursos:', error.message);
-    throw error.message;
+    throw error;
   }
 }
 
 async function fetchAdjudicacoes() {
   try {
-    const $ = await fetchPage(`${BASE_URL}${ENDPOINTS.adjudicacoes}`);
+    const $ = await fetchWithBackoff(`${BASE_URL}${ENDPOINTS.adjudicacoes}`);
     const adjudicacoes = [];
 
     $('table tbody tr').each((i, element) => {
@@ -123,7 +172,7 @@ async function fetchAdjudicacoes() {
 
 async function fetchAjustesDirectos() {
   try {
-    const $ = await fetchPage(`${BASE_URL}${ENDPOINTS.ajustesDirectos}`);
+    const $ = await fetchWithBackoff(`${BASE_URL}${ENDPOINTS.ajustesDirectos}`);
     const ajustes = [];
 
     $('table tbody tr').each((i, element) => {
@@ -145,26 +194,6 @@ async function fetchAjustesDirectos() {
   } catch (error) { 
     console.error('Error fetching ajustes directos:', error);
     throw error;
-  }
-}
-
-async function fetchDetails(type, referencia) {
-  try {
-    const endpoint = DETAIL_ENDPOINTS[type];
-    const url = `${BASE_URL}/${endpoint}?referencia=${encodeURIComponent(referencia)}`;
-    const $ = await fetchPage(url);
-    
-    const details = {};
-    $('table tbody tr').each((i, element) => {
-      const key = $(element).find('td:nth-child(1)').text().trim().toLowerCase();
-      const value = $(element).find('td:nth-child(2)').text().trim();
-      details[key] = value;
-    });
-
-    return details;
-  } catch (error) {
-    console.error(`Error fetching details for ${type}:`, error);
-    return null;
   }
 }
 

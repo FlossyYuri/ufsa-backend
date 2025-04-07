@@ -1,22 +1,12 @@
 import express from 'express';
 import cors from 'cors';
 import morgan from 'morgan';
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
 import { setupRoutes } from './routes.js';
 import { initializeCache } from './services/cache.js';
 import { setupLogging } from './utils/logging.js';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 const PORT = process.env.PORT || 3000;
-
-// Create logs directory if it doesn't exist
-const logsDir = path.join(__dirname, '../logs');
-if (!fs.existsSync(logsDir)) {
-  fs.mkdirSync(logsDir, { recursive: true });
-}
 
 // Middleware
 app.use(cors());

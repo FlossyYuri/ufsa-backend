@@ -29,7 +29,7 @@ function calculateMonthlyTrends(data, months = 6) {
 
 function calculateGrowthRate(current, previous) {
   if (previous === 0) return current > 0 ? 100 : 0;
-  return Math.round(((current - previous) / previous) * 100);
+  return Number(((current - previous) / previous * 100).toFixed(1));
 }
 
 function calculateValueDistribution(adjustments) {
@@ -61,11 +61,11 @@ function calculateProvinceDistribution(tenders) {
     distribution[tender.provincia] = (distribution[tender.provincia] || 0) + 1;
   });
 
-  // Convert to percentages and round
+  // Convert to percentages and round to 1 decimal
   Object.keys(distribution).forEach(province => {
     distribution[province] = {
       count: distribution[province],
-      percentage: Math.round((distribution[province] / total) * 100)
+      percentage: Number(((distribution[province] / total) * 100).toFixed(1))
     };
   });
 
@@ -80,11 +80,11 @@ function calculateTenderTypeDistribution(tenders) {
     distribution[tender.tipo_concurso] = (distribution[tender.tipo_concurso] || 0) + 1;
   });
 
-  // Convert to percentages and round
+  // Convert to percentages and round to 1 decimal
   Object.keys(distribution).forEach(type => {
     distribution[type] = {
       count: distribution[type],
-      percentage: Math.round((distribution[type] / total) * 100)
+      percentage: Number(((distribution[type] / total) * 100).toFixed(1))
     };
   });
 
@@ -159,10 +159,13 @@ export function calculateDashboardStats(data) {
     ).length
   };
 
-  // Calculate total value of direct adjustments and round
-  const totalDirectAdjustmentsValue = Math.round(data.ajustes_diretos.reduce((sum, adj) => sum + adj.valor, 0));
+  // Calculate total value of direct adjustments and round to 2 decimals
+  const totalDirectAdjustmentsValue = Number(
+    data.ajustes_diretos.reduce((sum, adj) => sum + adj.valor, 0).toFixed(2)
+  );
+  
   const averageDirectAdjustmentValue = data.ajustes_diretos.length > 0 ? 
-    Math.round(totalDirectAdjustmentsValue / data.ajustes_diretos.length) : 0;
+    Number((totalDirectAdjustmentsValue / data.ajustes_diretos.length).toFixed(2)) : 0;
 
   return {
     primary_metrics: {
