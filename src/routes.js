@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { getCache } from './services/cache.js';
 import { createObjectCsvWriter } from 'csv-writer';
 import { calculateDashboardStats } from './services/statistics.js';
-import { fetchTenderDetails } from './services/scraper.js';
+import { fetchTenderDetails, fetchPdfDocument } from './services/scraper.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -25,6 +25,7 @@ export function setupRoutes(app) {
         '/api/concursos/export': 'Export tenders in CSV or JSON format',
         '/api/stats/dashboard': 'Get dashboard statistics',
         '/api/concursos/detalhes?referencia=1': 'Get detailed information for a specific tender (use ?referencia=value)',
+        '/api/proxy-pdf?referencia=1&type=document': 'Proxy for PDF documents from the remote server. Use type=document (default) for tender documents or type=announcement for tender announcements',
         '/api/status': 'Check API status'
       }
     });
@@ -42,7 +43,7 @@ export function setupRoutes(app) {
       }
 
       const details = await fetchTenderDetails(referencia);
-      
+
       if (!details) {
         return res.status(404).json({
           error: 'Not Found',
@@ -76,26 +77,26 @@ export function setupRoutes(app) {
     const { provincia, tipo_concurso, entidade, search, page = 1, limit = 10 } = req.query;
 
     if (provincia) {
-      results = results.filter(tender => 
+      results = results.filter(tender =>
         tender.provincia.toLowerCase() === provincia.toLowerCase()
       );
     }
 
     if (tipo_concurso) {
-      results = results.filter(tender => 
+      results = results.filter(tender =>
         tender.tipo_concurso.toLowerCase() === tipo_concurso.toLowerCase()
       );
     }
 
     if (entidade) {
-      results = results.filter(tender => 
+      results = results.filter(tender =>
         tender.ugea.toLowerCase().includes(entidade.toLowerCase())
       );
     }
 
     if (search) {
-      results = results.filter(tender => 
-        Object.values(tender).some(value => 
+      results = results.filter(tender =>
+        Object.values(tender).some(value =>
           value && value.toString().toLowerCase().includes(search.toLowerCase())
         )
       );
@@ -126,8 +127,8 @@ export function setupRoutes(app) {
     const { search, page = 1, limit = 10 } = req.query;
 
     if (search) {
-      results = results.filter(tender => 
-        Object.values(tender).some(value => 
+      results = results.filter(tender =>
+        Object.values(tender).some(value =>
           value && value.toString().toLowerCase().includes(search.toLowerCase())
         )
       );
@@ -158,13 +159,13 @@ export function setupRoutes(app) {
     const { entidade, contratada, valor_min, valor_max, search, page = 1, limit = 10 } = req.query;
 
     if (entidade) {
-      results = results.filter(tender => 
+      results = results.filter(tender =>
         tender.ugea.toLowerCase().includes(entidade.toLowerCase())
       );
     }
 
     if (contratada) {
-      results = results.filter(tender => 
+      results = results.filter(tender =>
         tender.contratada.toLowerCase().includes(contratada.toLowerCase())
       );
     }
@@ -178,8 +179,8 @@ export function setupRoutes(app) {
     }
 
     if (search) {
-      results = results.filter(tender => 
-        Object.values(tender).some(value => 
+      results = results.filter(tender =>
+        Object.values(tender).some(value =>
           value && value.toString().toLowerCase().includes(search.toLowerCase())
         )
       );
@@ -274,6 +275,76 @@ export function setupRoutes(app) {
       ...cache.status,
       statistics: cache.tenders.meta.estatisticas
     });
+  });
+
+  // PDF Proxy endpoint
+  router.get('/api/proxy-pdf', async (req, res) => {
+    try {
+      const { referencia, type } = req.query;
+
+      if (!referencia) {
+        return res.status(400).json({
+          error: 'Bad Request',
+          message: 'Reference number (referencia) is required as a query parameter'
+        });
+      }
+
+      // Validate referencia to prevent abuse (only allow alphanumeric and some special chars)
+      if (!/^[a-zA-Z0-9\-\/._\s%]+$/.test(referencia)) {
+        return res.status(400).json({
+          error: 'Bad Request',
+          message: 'Invalid reference number format'
+        });
+      }
+
+      // Determine document type (announcement or document)
+      const documentType = type === 'announcement' ? 'announcement' : 'document';
+
+      // Fetch the PDF document
+      const pdfResponse = await fetchPdfDocument(referencia, documentType);
+
+      // Set appropriate headers for PDF response
+      res.setHeader('Content-Type', pdfResponse.contentType);
+      res.setHeader('Content-Disposition', `inline; filename="${pdfResponse.fileName}"`);
+
+      if (pdfResponse.contentLength) {
+        res.setHeader('Content-Length', pdfResponse.contentLength);
+      }
+
+      // Send the PDF data
+      res.send(pdfResponse.data);
+
+    } catch (error) {
+      console.error('Error proxying PDF:', error);
+
+      // Handle different types of errors
+      if (error.response) {
+        // The request was made and the server responded with a status code outside of 2xx range
+        if (error.response.status === 404) {
+          return res.status(404).json({
+            error: 'Not Found',
+            message: 'The requested PDF document could not be found'
+          });
+        } else {
+          return res.status(error.response.status || 500).json({
+            error: 'Remote Server Error',
+            message: 'The remote server returned an error'
+          });
+        }
+      } else if (error.request) {
+        // The request was made but no response was received
+        return res.status(504).json({
+          error: 'Gateway Timeout',
+          message: 'The remote server did not respond in time'
+        });
+      } else {
+        // Something happened in setting up the request
+        return res.status(500).json({
+          error: 'Internal Server Error',
+          message: process.env.NODE_ENV === 'development' ? error.message : 'An error occurred while processing your request'
+        });
+      }
+    }
   });
 
   app.use(router);

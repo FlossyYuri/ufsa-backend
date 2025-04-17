@@ -57,7 +57,7 @@ async function fetchWithBackoff(url) {
       try {
         // Random delay between 2-5 seconds
         await delay(2000 + Math.random() * 3000);
-        
+
         const response = await client.get(url);
         return cheerio.load(response.data);
       } catch (error) {
@@ -66,7 +66,7 @@ async function fetchWithBackoff(url) {
           status: error.response?.status,
           statusText: error.response?.statusText
         });
-        
+
         // If we get a 523, throw a specific error
         if (error.response?.status === 523) {
           throw new Error('Origin server unreachable (523)');
@@ -109,8 +109,6 @@ export async function fetchTenderDetails(referencia) {
       const link2 = $(element).find('td:last-child a').attr('href');
       details["Documento do Concurso"] = "https://www.ufsa.gov.mz/" + link2
     });
-
-    console.log(details);
     return details;
   } catch (error) {
     console.error('Error fetching tender details:', error);
@@ -122,12 +120,12 @@ async function fetchConcursos() {
   try {
     const $ = await fetchWithBackoff(`${BASE_URL}${ENDPOINTS.concursos}`);
     const concursos = [];
-    
+
     $('table tbody tr').each((i, element) => {
-      const tipo = $(element).find('td:nth-child(1)').text().trim().replace("Ver detalhes","").replaceAll("\n","")
+      const tipo = $(element).find('td:nth-child(1)').text().trim().replace("Ver detalhes", "").replaceAll("\n", "")
       const concurso = {
-        tipo_concurso: tipo.substring(0,tipo.indexOf(':')),
-        referencia: tipo.substring(tipo.indexOf(':')+1),
+        tipo_concurso: tipo.substring(0, tipo.indexOf(':')),
+        referencia: tipo.substring(tipo.indexOf(':') + 1),
         objeto: $(element).find('td:nth-child(2)').text().trim(),
         ugea: $(element).find('td:nth-child(3)').text().trim(),
         provincia: $(element).find('td:nth-child(4)').text().trim(),
@@ -138,7 +136,7 @@ async function fetchConcursos() {
       };
       concursos.push(concurso);
     });
-    
+
     concursos.pop();
     return concursos;
   } catch (error) {
@@ -154,7 +152,7 @@ async function fetchAdjudicacoes() {
 
     $('table tbody tr').each((i, element) => {
       const adjudicacao = {
-        referencia: $(element).find('td:nth-child(1)').text().trim().replace("Ver detalhes",""),
+        referencia: $(element).find('td:nth-child(1)').text().trim().replace("Ver detalhes", ""),
         objeto: $(element).find('td:nth-child(2)').text().trim(),
         data_adjudicacao: $(element).find('td:nth-child(3)').text().trim(),
         link_detalhes: $(element).find('td:nth-child(1) a').attr('href')
@@ -178,8 +176,8 @@ async function fetchAjustesDirectos() {
     $('table tbody tr').each((i, element) => {
       const contratada = $(element).find('td:nth-child(4)').text().trim()
       const ajuste = {
-        referencia: $(element).find('td:nth-child(1)').text().trim().replace("Ver detalhes",""),
-        objeto: $(element).find('td:nth-child(2)').text().trim().replace("\n"," "),
+        referencia: $(element).find('td:nth-child(1)').text().trim().replace("Ver detalhes", ""),
+        objeto: $(element).find('td:nth-child(2)').text().trim().replace("\n", " "),
         ugea: $(element).find('td:nth-child(3)').text().trim(),
         contratada: contratada.substring(contratada.indexOf(' ')).trim(),
         valor: parseFloat($(element).find('td:nth-child(5)').text().trim().replace(/[^\d.-]/g, '')),
@@ -191,8 +189,58 @@ async function fetchAjustesDirectos() {
     ajustes.pop();
 
     return ajustes;
-  } catch (error) { 
+  } catch (error) {
     console.error('Error fetching ajustes directos:', error);
+    throw error;
+  }
+}
+
+export async function fetchPdfDocument(referencia, type = 'document') {
+  try {
+    // Determine the URL based on the type of document requested
+    let url;
+    let fileName;
+
+    if (type === 'announcement') {
+      // URL for the official tender announcement document
+      url = `${BASE_URL}/includes/Baixar_anuncio.php?REFERENCIA=${encodeURIComponent(referencia)}`;
+      fileName = `anuncio-${referencia}.pdf`;
+    } else {
+      // URL for the tender terms and references document (default)
+      url = `${BASE_URL}/includes/Baixar_cad_enc.php?REFERENCIA=${encodeURIComponent(referencia)}`;
+      fileName = `documento-${referencia}.pdf`;
+    }
+
+    console.log(`Fetching PDF from: ${url}`);
+
+    // Use axios to fetch the PDF with responseType set to 'arraybuffer'
+    const response = await client.get(url, {
+      responseType: 'arraybuffer',
+      // Don't parse the response as it's binary data
+      transformResponse: [(data) => data],
+      // Increase timeout for large files
+      timeout: 60000,
+      // Set headers that might help with PDF content
+      headers: {
+        ...headers,
+        'Accept': 'application/pdf,application/octet-stream'
+      }
+    });
+
+    // Return both the data and content type for proper handling in the route
+    return {
+      data: response.data,
+      contentType: response.headers['content-type'] || 'application/pdf',
+      contentLength: response.headers['content-length'],
+      fileName: fileName
+    };
+  } catch (error) {
+    console.error('Error fetching PDF document:', {
+      message: error.message,
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      url: error.config?.url
+    });
     throw error;
   }
 }

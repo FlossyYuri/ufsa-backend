@@ -3,11 +3,13 @@
 ## Base URL
 
 Development:
+
 ```
 http://localhost:3000
 ```
 
 Production:
+
 ```
 https://ufsa-concursos-api.stackblitz.app
 ```
@@ -15,16 +17,49 @@ https://ufsa-concursos-api.stackblitz.app
 > **Note**: Since this API is running locally in development, you'll need to deploy it to make it accessible from other applications. You can deploy it to a platform of your choice or use StackBlitz's deployment features.
 
 ## Authentication
+
 Currently, the API is open and does not require authentication.
+
+## PDF Proxy
+
+The API includes a PDF proxy feature that allows you to fetch PDF documents from the UFSA website through the API. This solves CORS issues and ensures proper content-type handling.
+
+### Get Tender Document (Terms and References)
+
+```http
+GET /api/proxy-pdf?referencia=CR04J080441CC00032025&type=document
+```
+
+### Get Tender Announcement
+
+```http
+GET /api/proxy-pdf?referencia=03/04I130241/SDSMASV%202025&type=announcement
+```
+
+Query Parameters:
+
+- `referencia` (string, required): The reference number of the tender
+- `type` (string, optional): The type of document to fetch
+  - `document` (default): Fetches the tender terms and references document
+  - `announcement`: Fetches the official tender announcement document
+
+Response:
+
+- Content-Type: application/pdf
+- Content-Disposition: inline; filename="[filename].pdf"
+
+The PDF will be streamed directly to the client and can be displayed in a browser or downloaded.
 
 ## Endpoints
 
 ### Get All Open Tenders
+
 ```http
 GET /api/concursos/abertos
 ```
 
 Query Parameters:
+
 - `provincia` (string): Filter by province
 - `tipo_concurso` (string): Filter by tender type
 - `entidade` (string): Filter by contracting entity
@@ -33,6 +68,7 @@ Query Parameters:
 - `limit` (number, default: 10): Number of results per page
 
 Example Response:
+
 ```json
 {
   "total": 100,
@@ -59,16 +95,19 @@ Example Response:
 ```
 
 ### Get All Awarded Tenders
+
 ```http
 GET /api/concursos/adjudicados
 ```
 
 Query Parameters:
+
 - `search` (string): Search across all fields
 - `page` (number, default: 1): Page number for pagination
 - `limit` (number, default: 10): Number of results per page
 
 Example Response:
+
 ```json
 {
   "total": 50,
@@ -90,11 +129,13 @@ Example Response:
 ```
 
 ### Get All Direct Adjustments
+
 ```http
 GET /api/concursos/ajustes-directos
 ```
 
 Query Parameters:
+
 - `entidade` (string): Filter by contracting entity
 - `contratada` (string): Filter by contracted company
 - `valor_min` (number): Minimum value filter
@@ -104,6 +145,7 @@ Query Parameters:
 - `limit` (number, default: 10): Number of results per page
 
 Example Response:
+
 ```json
 {
   "total": 75,
@@ -128,6 +170,7 @@ Example Response:
 ```
 
 ### Get Dashboard Statistics
+
 ```http
 GET /api/stats/dashboard
 ```
@@ -135,6 +178,7 @@ GET /api/stats/dashboard
 Returns comprehensive statistics and analytics about tenders and direct adjustments.
 
 Example Response:
+
 ```json
 {
   "primary_metrics": {
@@ -218,11 +262,13 @@ Example Response:
 ```
 
 ### Get Available Provinces
+
 ```http
 GET /api/concursos/provincias
 ```
 
 Example Response:
+
 ```json
 [
   "Maputo",
@@ -234,11 +280,13 @@ Example Response:
 ```
 
 ### Get Tender Types
+
 ```http
 GET /api/concursos/tipos
 ```
 
 Example Response:
+
 ```json
 [
   "Concurso Público",
@@ -248,11 +296,13 @@ Example Response:
 ```
 
 ### Get Contracting Entities
+
 ```http
 GET /api/concursos/entidades
 ```
 
 Example Response:
+
 ```json
 [
   "Ministério da Educação",
@@ -262,11 +312,13 @@ Example Response:
 ```
 
 ### Export Data
+
 ```http
 GET /api/concursos/export
 ```
 
 Query Parameters:
+
 - `type` (string, default: 'abertos'): Type of tenders to export ('abertos', 'adjudicados', 'ajustes-directos')
 - `format` (string, default: 'json'): Export format ('json', 'csv')
 
@@ -274,11 +326,13 @@ For JSON format, returns the same structure as the respective endpoints.
 For CSV format, downloads a file with all records.
 
 ### API Status
+
 ```http
 GET /api/status
 ```
 
 Example Response:
+
 ```json
 {
   "status": "operational",
@@ -302,6 +356,7 @@ The API uses standard HTTP status codes:
 - 500: Internal Server Error
 
 Error Response Format:
+
 ```json
 {
   "error": "Error type",
@@ -312,6 +367,7 @@ Error Response Format:
 ## Data Source Information
 
 The API includes a `dataSource` object in responses that indicates:
+
 - `isUsingPersistedData`: Whether the data is from cache or live
 - `lastUpdate`: When the data was last updated
 - `retryAttempts`: Number of failed update attempts
