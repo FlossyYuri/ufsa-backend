@@ -2,8 +2,9 @@ import axios from 'axios';
 import axiosRetry from 'axios-retry';
 import * as cheerio from 'cheerio';
 import { backOff } from 'exponential-backoff';
+import config from '../config.js';
 
-const BASE_URL = 'https://www.ufsa.gov.mz';
+const BASE_URL = config.ufsa.baseUrl;
 const ENDPOINTS = {
   concursos: '/query/Busca_concurso1.php'
 };
@@ -22,7 +23,7 @@ const client = axios.create({
 });
 
 axiosRetry(client, {
-  retries: 5,
+  retries: config.request.maxAttempts,
   retryDelay: (retryCount) => {
     const delay = Math.min(1000 * (2 ** retryCount), 10000);
     const randomization = Math.random() * 1000;
@@ -48,8 +49,8 @@ async function fetchWithBackoff(url) {
   return backOff(
     async () => {
       try {
-        // Random delay between 2-5 seconds
-        await delay(2000 + Math.random() * 3000);
+        // Random delay between min and max delay
+        await delay(config.request.minDelay + Math.random() * (config.request.maxDelay - config.request.minDelay));
 
         const response = await client.get(url);
         return cheerio.load(response.data);
@@ -68,7 +69,7 @@ async function fetchWithBackoff(url) {
       }
     },
     {
-      numOfAttempts: 5,
+      numOfAttempts: config.request.maxAttempts,
       startingDelay: 1000,
       timeMultiple: 2,
       maxDelay: 30000,
@@ -155,8 +156,6 @@ export async function fetchPdfDocument(referencia, type = 'document') {
       url = `${BASE_URL}/includes/Baixar_cad_enc.php?REFERENCIA=${encodeURIComponent(referencia)}`;
       fileName = `documento-${referencia}.pdf`;
     }
-
-    console.log(`Fetching PDF from: ${url}`);
 
     // Use axios to fetch the PDF with responseType set to 'arraybuffer'
     const response = await client.get(url, {

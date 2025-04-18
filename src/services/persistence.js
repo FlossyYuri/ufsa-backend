@@ -1,10 +1,11 @@
 import axios from 'axios';
+import config from '../config.js';
 
-const API_URL = 'https://ejitech.co.mz/data-api.php';
+const { apiUrl } = config.persistence;
 
 export async function saveData(data) {
   try {
-    await axios.post(API_URL, data);
+    await axios.post(apiUrl, data);
     console.log('Data saved successfully to remote API');
     return true;
   } catch (error) {
@@ -15,7 +16,7 @@ export async function saveData(data) {
 
 export async function loadData() {
   try {
-    const response = await axios.get(API_URL);
+    const response = await axios.get(apiUrl);
     console.log('Data loaded successfully from remote API');
     return response.data;
   } catch (error) {

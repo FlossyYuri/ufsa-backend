@@ -1,6 +1,7 @@
 import { fetchUfsaData } from './scraper.js';
 import { saveData, loadData, getLastUpdateDate } from './persistence.js';
 import axios from 'axios';
+import config from '../config.js';
 
 let cache = {
   tenders: [],
@@ -9,10 +10,8 @@ let cache = {
   isUsingPersistedData: false
 };
 
-const CACHE_INTERVAL = 8 * 60 * 60 * 1000; // 8 hours
-const MAX_RETRY_ATTEMPTS = 2;
-const RETRY_DELAY = 5 * 60 * 1000; // 5 minutes
-const UFSA_BASE_URL = 'https://www.ufsa.gov.mz';
+const { interval: CACHE_INTERVAL, maxRetryAttempts: MAX_RETRY_ATTEMPTS, retryDelay: RETRY_DELAY } = config.cache;
+const { baseUrl: UFSA_BASE_URL } = config.ufsa;
 
 async function checkUfsaAvailability() {
   try {
@@ -50,6 +49,8 @@ export async function initializeCache() {
   } catch (error) {
     console.error('Failed to initialize cache:', error);
 
+    // Try to load saved data if cache is empty
+    const savedData = await loadData();
     if (!cache.tenders.length && savedData) {
       // If fresh fetch fails but we have saved data, use it
       cache = {

@@ -340,3 +340,46 @@ The API includes a `dataSource` object in responses that indicates:
 ## Rate Limiting
 
 Currently, there are no rate limits implemented.
+
+## Installation
+
+```bash
+# Clone the repository
+git clone https://github.com/yourusername/ufsa-concursos-api.git
+cd ufsa-concursos-api
+
+# Install dependencies
+yarn install
+
+# Copy the example environment file
+cp .env.example .env
+
+# Start the server
+yarn start
+```
+
+## Environment Variables
+
+The application uses environment variables for configuration. Create a `.env` file in the root directory with the following variables:
+
+```
+# Server Configuration
+PORT=3000                   # Port to run the server on
+NODE_ENV=development        # Environment (development, production)
+
+# UFSA API Configuration
+UFSA_BASE_URL=https://www.ufsa.gov.mz  # Base URL for UFSA website
+
+# Persistence API Configuration
+PERSISTENCE_API_URL=https://ejitech.co.mz/data-api.php  # API for data persistence
+
+# Cache Configuration (in milliseconds)
+CACHE_INTERVAL=28800000     # Cache refresh interval (8 hours)
+MAX_RETRY_ATTEMPTS=2        # Maximum retry attempts for cache updates
+RETRY_DELAY=300000          # Delay between retry attempts (5 minutes)
+
+# Request Configuration
+REQUEST_MIN_DELAY=2000      # Minimum delay between requests (2 seconds)
+REQUEST_MAX_DELAY=5000      # Maximum delay between requests (5 seconds)
+REQUEST_MAX_ATTEMPTS=5      # Maximum retry attempts for requests
+```
