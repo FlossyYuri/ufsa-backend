@@ -5,16 +5,10 @@ import { backOff } from 'exponential-backoff';
 
 const BASE_URL = 'https://www.ufsa.gov.mz';
 const ENDPOINTS = {
-  concursos: '/query/Busca_concurso1.php',
-  adjudicacoes: '/query/Busca_adjudicacao.php',
-  ajustesDirectos: '/query/Busca_ajustes_directos.php'
+  concursos: '/query/Busca_concurso1.php'
 };
 
-const DETAIL_ENDPOINTS = {
-  concursos: 'concurso_detalhes.php',
-  adjudicacoes: 'adjudicacao_detalhes.php',
-  ajustesDirectos: 'ajustes_directos_detalhes.php'
-};
+const DETAIL_ENDPOINT = 'concurso_detalhes.php';
 
 // Browser-like headers
 const headers = {
@@ -86,7 +80,7 @@ async function fetchWithBackoff(url) {
 
 export async function fetchTenderDetails(referencia) {
   try {
-    const url = `${BASE_URL}/concurso_detalhes.php?referencia=${encodeURIComponent(referencia)}`;
+    const url = `${BASE_URL}/${DETAIL_ENDPOINT}?referencia=${encodeURIComponent(referencia)}`;
     const $ = await fetchWithBackoff(url);
 
     const details = {};
@@ -145,55 +139,7 @@ async function fetchConcursos() {
   }
 }
 
-async function fetchAdjudicacoes() {
-  try {
-    const $ = await fetchWithBackoff(`${BASE_URL}${ENDPOINTS.adjudicacoes}`);
-    const adjudicacoes = [];
-
-    $('table tbody tr').each((i, element) => {
-      const adjudicacao = {
-        referencia: $(element).find('td:nth-child(1)').text().trim().replace("Ver detalhes", ""),
-        objeto: $(element).find('td:nth-child(2)').text().trim(),
-        data_adjudicacao: $(element).find('td:nth-child(3)').text().trim(),
-        link_detalhes: $(element).find('td:nth-child(1) a').attr('href')
-      };
-      adjudicacoes.push(adjudicacao);
-    });
-    adjudicacoes.pop();
-
-    return adjudicacoes;
-  } catch (error) {
-    console.error('Error fetching adjudicacoes:', error);
-    throw error;
-  }
-}
-
-async function fetchAjustesDirectos() {
-  try {
-    const $ = await fetchWithBackoff(`${BASE_URL}${ENDPOINTS.ajustesDirectos}`);
-    const ajustes = [];
-
-    $('table tbody tr').each((i, element) => {
-      const contratada = $(element).find('td:nth-child(4)').text().trim()
-      const ajuste = {
-        referencia: $(element).find('td:nth-child(1)').text().trim().replace("Ver detalhes", ""),
-        objeto: $(element).find('td:nth-child(2)').text().trim().replace("\n", " "),
-        ugea: $(element).find('td:nth-child(3)').text().trim(),
-        contratada: contratada.substring(contratada.indexOf(' ')).trim(),
-        valor: parseFloat($(element).find('td:nth-child(5)').text().trim().replace(/[^\d.-]/g, '')),
-        data: $(element).find('td:nth-child(6)').text().trim(),
-        link_detalhes: $(element).find('td:nth-child(1) a').attr('href')
-      };
-      ajustes.push(ajuste);
-    });
-    ajustes.pop();
-
-    return ajustes;
-  } catch (error) {
-    console.error('Error fetching ajustes directos:', error);
-    throw error;
-  }
-}
+// Only fetchConcursos is needed as we're focusing only on open tenders
 
 export async function fetchPdfDocument(referencia, type = 'document') {
   try {
@@ -247,11 +193,7 @@ export async function fetchPdfDocument(referencia, type = 'document') {
 
 export async function fetchUfsaData() {
   try {
-    const [concursos, adjudicacoes, ajustes] = await Promise.all([
-      fetchConcursos(),
-      fetchAdjudicacoes(),
-      fetchAjustesDirectos()
-    ]);
+    const concursos = await fetchConcursos();
 
     // Add metadata
     const data = {
@@ -259,15 +201,11 @@ export async function fetchUfsaData() {
         ultima_atualizacao: new Date().toISOString(),
         versao: "1.0.0",
         estatisticas: {
-          concursos_abertos: concursos.length,
-          concursos_adjudicados: adjudicacoes.length,
-          ajustes_diretos: ajustes.length
+          concursos_abertos: concursos.length
         }
       },
       dados: {
-        concursos_abertos: concursos,
-        concursos_adjudicados: adjudicacoes,
-        ajustes_diretos: ajustes
+        concursos_abertos: concursos
       }
     };
 

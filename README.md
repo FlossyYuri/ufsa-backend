@@ -1,4 +1,4 @@
-# UFSA Concursos API Documentation
+# UFSA Concursos Abertos API Documentation
 
 ## Base URL
 
@@ -94,80 +94,7 @@ Example Response:
 }
 ```
 
-### Get All Awarded Tenders
-
-```http
-GET /api/concursos/adjudicados
-```
-
-Query Parameters:
-
-- `search` (string): Search across all fields
-- `page` (number, default: 1): Page number for pagination
-- `limit` (number, default: 10): Number of results per page
-
-Example Response:
-
-```json
-{
-  "total": 50,
-  "page": 1,
-  "totalPages": 5,
-  "results": [
-    {
-      "referencia": "27A001141/CP/001/2025",
-      "objeto": "Fornecimento de Material de Escritório",
-      "data_adjudicacao": "2025-03-15"
-    }
-  ],
-  "dataSource": {
-    "isUsingPersistedData": false,
-    "lastUpdate": "2025-03-20T13:20:21.000Z",
-    "retryAttempts": 0
-  }
-}
-```
-
-### Get All Direct Adjustments
-
-```http
-GET /api/concursos/ajustes-directos
-```
-
-Query Parameters:
-
-- `entidade` (string): Filter by contracting entity
-- `contratada` (string): Filter by contracted company
-- `valor_min` (number): Minimum value filter
-- `valor_max` (number): Maximum value filter
-- `search` (string): Search across all fields
-- `page` (number, default: 1): Page number for pagination
-- `limit` (number, default: 10): Number of results per page
-
-Example Response:
-
-```json
-{
-  "total": 75,
-  "page": 1,
-  "totalPages": 8,
-  "results": [
-    {
-      "referencia": "27A001141/AD/001/2025",
-      "objeto": "Manutenção de Equipamentos",
-      "ugea": "Ministério da Saúde",
-      "contratada": "TechServ Lda",
-      "valor": 150000.00,
-      "data": "2025-03-18"
-    }
-  ],
-  "dataSource": {
-    "isUsingPersistedData": false,
-    "lastUpdate": "2025-03-20T13:20:21.000Z",
-    "retryAttempts": 0
-  }
-}
-```
+<!-- Removed sections for awarded tenders and direct adjustments -->
 
 ### Get Dashboard Statistics
 
@@ -175,28 +102,41 @@ Example Response:
 GET /api/stats/dashboard
 ```
 
-Returns comprehensive statistics and analytics about tenders and direct adjustments.
+Returns comprehensive statistics and analytics about open tenders, including upcoming tenders, geographical insights, content analysis, and more.
 
 Example Response:
 
 ```json
 {
+  "meta": {
+    "generated_at": "2025-04-10T14:30:45.123Z",
+    "current_date": "2025-04-10",
+    "data_source": {
+      "total_tenders_analyzed": 100
+    }
+  },
   "primary_metrics": {
     "total_open_tenders": 100,
-    "total_awarded_tenders": 50,
-    "total_direct_adjustments": 75,
-    "total_direct_adjustments_value": 15000000.00,
     "growth_rates": {
-      "open_tenders": 25.5,
-      "awarded_tenders": 10.2,
-      "direct_adjustments": -5.3
+      "open_tenders": 25.5
+    },
+    "upcoming_tenders": {
+      "next_7_days": 12,
+      "next_14_days": 18,
+      "next_30_days": 35
     }
   },
   "secondary_metrics": {
     "unique_entities": 45,
     "unique_provinces": 11,
-    "average_direct_adjustment_value": 200000.00,
-    "average_days_until_opening": 15
+    "average_days_until_opening": 15,
+    "time_to_opening_distribution": {
+      "already_opened": 10,
+      "1-7_days": 12,
+      "8-14_days": 6,
+      "15-30_days": 17,
+      "more_than_30_days": 55
+    }
   },
   "distribution_metrics": {
     "province_distribution": {
@@ -210,22 +150,21 @@ Example Response:
         "count": 50,
         "percentage": 50.0
       }
-    },
-    "value_distribution": {
-      "0-100k": 20,
-      "100k-500k": 30,
-      "500k-1M": 15,
-      "1M-5M": 8,
-      "5M+": 2
     }
   },
   "time_based_analytics": {
     "monthly_trends": [
       {
         "month": "2025-03",
-        "open_tenders": 35,
-        "awarded_tenders": 20,
-        "direct_adjustments": 25
+        "open_tenders": 35
+      }
+    ],
+    "tender_types_trend": [
+      {
+        "month": "2025-03",
+        "Concurso Público": 20,
+        "Concurso Limitado": 10,
+        "Concurso por Cotações": 5
       }
     ]
   },
@@ -237,25 +176,54 @@ Example Response:
       }
     ]
   },
-  "recent_activity": {
-    "recent_awards": [
+  "geographical_insights": {
+    "Maputo": {
+      "count": 30,
+      "percentage": 30.0,
+      "types": {
+        "Concurso Público": {
+          "count": 15,
+          "percentage": 50.0
+        },
+        "Concurso Limitado": {
+          "count": 10,
+          "percentage": 33.3
+        },
+        "Concurso por Cotações": {
+          "count": 5,
+          "percentage": 16.7
+        }
+      }
+    }
+  },
+  "content_analytics": {
+    "common_keywords": [
       {
-        "referencia": "27A001141/CP/001/2025",
-        "objeto": "Fornecimento de Material de Escritório",
-        "data_adjudicacao": "2025-03-15"
+        "word": "fornecimento",
+        "count": 25
+      },
+      {
+        "word": "construção",
+        "count": 18
       }
     ]
   },
+  "recent_tenders": [
+    {
+      "referencia": "27A001141/CP/001/2025",
+      "objeto": "Fornecimento de Material de Escritório",
+      "ugea": "Ministério da Educação",
+      "provincia": "Maputo",
+      "data_lancamento": "2025-04-05",
+      "data_abertura": "2025-04-20"
+    }
+  ],
   "period_comparisons": {
     "current_month": {
-      "open": 35,
-      "awarded": 20,
-      "direct": 25
+      "open": 35
     },
     "previous_month": {
-      "open": 28,
-      "awarded": 18,
-      "direct": 27
+      "open": 28
     }
   }
 }
@@ -319,7 +287,6 @@ GET /api/concursos/export
 
 Query Parameters:
 
-- `type` (string, default: 'abertos'): Type of tenders to export ('abertos', 'adjudicados', 'ajustes-directos')
 - `format` (string, default: 'json'): Export format ('json', 'csv')
 
 For JSON format, returns the same structure as the respective endpoints.
@@ -340,9 +307,7 @@ Example Response:
   "lastUpdate": "2025-03-20T13:20:21.000Z",
   "retryAttempts": 0,
   "statistics": {
-    "concursos_abertos": 100,
-    "concursos_adjudicados": 50,
-    "ajustes_diretos": 75
+    "concursos_abertos": 100
   }
 }
 ```

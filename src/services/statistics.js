@@ -1,4 +1,4 @@
-import { differenceInDays, subMonths, parseISO, isWithinInterval, startOfMonth, endOfMonth } from 'date-fns';
+import { differenceInDays, addDays, subMonths, parseISO, isWithinInterval, startOfMonth, endOfMonth, isFuture, isAfter, isBefore, format } from 'date-fns';
 
 function calculateMonthlyTrends(data, months = 6) {
   const now = new Date();
@@ -10,14 +10,8 @@ function calculateMonthlyTrends(data, months = 6) {
 
     const monthData = {
       month: monthStart.toISOString().slice(0, 7),
-      open_tenders: data.concursos_abertos.filter(tender => 
+      open_tenders: data.concursos_abertos.filter(tender =>
         isWithinInterval(parseISO(tender.data_lancamento), { start: monthStart, end: monthEnd })
-      ).length,
-      awarded_tenders: data.concursos_adjudicados.filter(tender =>
-        isWithinInterval(parseISO(tender.data_adjudicacao), { start: monthStart, end: monthEnd })
-      ).length,
-      direct_adjustments: data.ajustes_diretos.filter(tender =>
-        isWithinInterval(parseISO(tender.data), { start: monthStart, end: monthEnd })
       ).length
     };
 
@@ -32,26 +26,7 @@ function calculateGrowthRate(current, previous) {
   return Number(((current - previous) / previous * 100).toFixed(1));
 }
 
-function calculateValueDistribution(adjustments) {
-  const ranges = {
-    '0-100k': 0,
-    '100k-500k': 0,
-    '500k-1M': 0,
-    '1M-5M': 0,
-    '5M+': 0
-  };
-
-  adjustments.forEach(adj => {
-    const value = adj.valor;
-    if (value <= 100000) ranges['0-100k']++;
-    else if (value <= 500000) ranges['100k-500k']++;
-    else if (value <= 1000000) ranges['500k-1M']++;
-    else if (value <= 5000000) ranges['1M-5M']++;
-    else ranges['5M+']++;
-  });
-
-  return ranges;
-}
+// Removed value distribution function as it was for direct adjustments
 
 function calculateProvinceDistribution(tenders) {
   const distribution = {};
@@ -94,8 +69,8 @@ function calculateTenderTypeDistribution(tenders) {
 function calculateTopEntities(data) {
   const entityCounts = {};
 
-  // Count tenders for each entity
-  [...data.concursos_abertos, ...data.concursos_adjudicados, ...data.ajustes_diretos].forEach(tender => {
+  // Count tenders for each entity (only open tenders)
+  data.concursos_abertos.forEach(tender => {
     entityCounts[tender.ugea] = (entityCounts[tender.ugea] || 0) + 1;
   });
 
@@ -111,10 +86,193 @@ function calculateAverageDaysUntilOpening(tenders) {
     const launch = parseISO(tender.data_lancamento);
     const opening = parseISO(tender.data_abertura);
     return differenceInDays(opening, launch);
-  });
+  }).filter(days => !isNaN(days) && days > 0); // Filter out invalid values
 
   const sum = daysArray.reduce((acc, days) => acc + days, 0);
   return daysArray.length > 0 ? Math.round(sum / daysArray.length) : 0;
+}
+
+function calculateTimeToOpeningDistribution(tenders) {
+  const now = new Date();
+  const distribution = {
+    'already_opened': 0,
+    '1-7_days': 0,
+    '8-14_days': 0,
+    '15-30_days': 0,
+    'more_than_30_days': 0
+  };
+
+  tenders.forEach(tender => {
+    try {
+      const opening = parseISO(tender.data_abertura);
+
+      if (isBefore(opening, now)) {
+        distribution.already_opened++;
+      } else {
+        const daysUntilOpening = differenceInDays(opening, now);
+
+        if (daysUntilOpening <= 7) {
+          distribution['1-7_days']++;
+        } else if (daysUntilOpening <= 14) {
+          distribution['8-14_days']++;
+        } else if (daysUntilOpening <= 30) {
+          distribution['15-30_days']++;
+        } else {
+          distribution.more_than_30_days++;
+        }
+      }
+    } catch (error) {
+      // Skip tenders with invalid dates
+    }
+  });
+
+  return distribution;
+}
+
+function calculateUpcomingTenders(tenders) {
+  const now = new Date();
+  const next7Days = addDays(now, 7);
+  const next14Days = addDays(now, 14);
+  const next30Days = addDays(now, 30);
+
+  return {
+    next_7_days: tenders.filter(tender => {
+      try {
+        const opening = parseISO(tender.data_abertura);
+        return isAfter(opening, now) && isBefore(opening, next7Days);
+      } catch (error) {
+        return false;
+      }
+    }).length,
+    next_14_days: tenders.filter(tender => {
+      try {
+        const opening = parseISO(tender.data_abertura);
+        return isAfter(opening, now) && isBefore(opening, next14Days);
+      } catch (error) {
+        return false;
+      }
+    }).length,
+    next_30_days: tenders.filter(tender => {
+      try {
+        const opening = parseISO(tender.data_abertura);
+        return isAfter(opening, now) && isBefore(opening, next30Days);
+      } catch (error) {
+        return false;
+      }
+    }).length
+  };
+}
+
+function extractCommonKeywords(tenders, minOccurrences = 3) {
+  // Extract words from tender objects
+  const allWords = tenders.flatMap(tender => {
+    const words = tender.objeto.toLowerCase()
+      .replace(/[^\w\sáàâãéèêíìîóòôõúùûç]/g, '') // Keep accented characters
+      .split(/\s+/)
+      .filter(word => word.length > 3); // Only words longer than 3 characters
+    return words;
+  });
+
+  // Count occurrences
+  const wordCounts = {};
+  allWords.forEach(word => {
+    wordCounts[word] = (wordCounts[word] || 0) + 1;
+  });
+
+  // Filter by minimum occurrences and sort by frequency
+  return Object.entries(wordCounts)
+    .filter(([_, count]) => count >= minOccurrences)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 20) // Top 20 keywords
+    .map(([word, count]) => ({ word, count }));
+}
+
+function calculateTenderTypesTrend(tenders, months = 6) {
+  const now = new Date();
+  const trends = [];
+
+  // Get all unique tender types
+  const tenderTypes = [...new Set(tenders.map(t => t.tipo_concurso))];
+
+  for (let i = 0; i < months; i++) {
+    const monthStart = startOfMonth(subMonths(now, i));
+    const monthEnd = endOfMonth(subMonths(now, i));
+
+    const monthData = {
+      month: monthStart.toISOString().slice(0, 7)
+    };
+
+    // Calculate count for each tender type in this month
+    tenderTypes.forEach(type => {
+      monthData[type] = tenders.filter(tender =>
+        tender.tipo_concurso === type &&
+        isWithinInterval(parseISO(tender.data_lancamento), { start: monthStart, end: monthEnd })
+      ).length;
+    });
+
+    trends.push(monthData);
+  }
+
+  return trends.reverse();
+}
+
+function getRecentTenders(tenders, count = 5) {
+  return tenders
+    .sort((a, b) => {
+      try {
+        return new Date(b.data_lancamento) - new Date(a.data_lancamento);
+      } catch (error) {
+        return 0;
+      }
+    })
+    .slice(0, count)
+    .map(tender => ({
+      referencia: tender.referencia,
+      objeto: tender.objeto,
+      ugea: tender.ugea,
+      provincia: tender.provincia,
+      data_lancamento: tender.data_lancamento,
+      data_abertura: tender.data_abertura
+    }));
+}
+
+function calculateGeographicalInsights(tenders) {
+  const provinces = {};
+
+  // Group tenders by province
+  tenders.forEach(tender => {
+    if (!provinces[tender.provincia]) {
+      provinces[tender.provincia] = [];
+    }
+    provinces[tender.provincia].push(tender);
+  });
+
+  // Calculate insights for each province
+  const insights = {};
+
+  Object.entries(provinces).forEach(([province, provinceTenders]) => {
+    insights[province] = {
+      count: provinceTenders.length,
+      percentage: Number(((provinceTenders.length / tenders.length) * 100).toFixed(1)),
+      types: {}
+    };
+
+    // Calculate tender type distribution within this province
+    provinceTenders.forEach(tender => {
+      insights[province].types[tender.tipo_concurso] =
+        (insights[province].types[tender.tipo_concurso] || 0) + 1;
+    });
+
+    // Convert counts to percentages
+    Object.keys(insights[province].types).forEach(type => {
+      insights[province].types[type] = {
+        count: insights[province].types[type],
+        percentage: Number(((insights[province].types[type] / provinceTenders.length) * 100).toFixed(1))
+      };
+    });
+  });
+
+  return insights;
 }
 
 export function calculateDashboardStats(data) {
@@ -129,82 +287,61 @@ export function calculateDashboardStats(data) {
 
   // Calculate current month counts
   const currentMonthCounts = {
-    open: data.concursos_abertos.filter(tender => 
-      isWithinInterval(parseISO(tender.data_lancamento), 
-      { start: currentMonthStart, end: currentMonthEnd })
-    ).length,
-    awarded: data.concursos_adjudicados.filter(tender => 
-      isWithinInterval(parseISO(tender.data_adjudicacao), 
-      { start: currentMonthStart, end: currentMonthEnd })
-    ).length,
-    direct: data.ajustes_diretos.filter(tender => 
-      isWithinInterval(parseISO(tender.data), 
-      { start: currentMonthStart, end: currentMonthEnd })
+    open: data.concursos_abertos.filter(tender =>
+      isWithinInterval(parseISO(tender.data_lancamento),
+        { start: currentMonthStart, end: currentMonthEnd })
     ).length
   };
 
   // Calculate previous month counts
   const previousMonthCounts = {
-    open: data.concursos_abertos.filter(tender => 
-      isWithinInterval(parseISO(tender.data_lancamento), 
-      { start: previousMonthStart, end: previousMonthEnd })
-    ).length,
-    awarded: data.concursos_adjudicados.filter(tender => 
-      isWithinInterval(parseISO(tender.data_adjudicacao), 
-      { start: previousMonthStart, end: previousMonthEnd })
-    ).length,
-    direct: data.ajustes_diretos.filter(tender => 
-      isWithinInterval(parseISO(tender.data), 
-      { start: previousMonthStart, end: previousMonthEnd })
+    open: data.concursos_abertos.filter(tender =>
+      isWithinInterval(parseISO(tender.data_lancamento),
+        { start: previousMonthStart, end: previousMonthEnd })
     ).length
   };
 
-  // Calculate total value of direct adjustments and round to 2 decimals
-  const totalDirectAdjustmentsValue = Number(
-    data.ajustes_diretos.reduce((sum, adj) => sum + adj.valor, 0).toFixed(2)
-  );
-  
-  const averageDirectAdjustmentValue = data.ajustes_diretos.length > 0 ? 
-    Number((totalDirectAdjustmentsValue / data.ajustes_diretos.length).toFixed(2)) : 0;
+  // Get today's date for upcoming tenders calculation
+  const today = new Date();
+  const formattedDate = format(today, 'yyyy-MM-dd');
 
   return {
-    primary_metrics: {
-      total_open_tenders: data.concursos_abertos.length,
-      total_awarded_tenders: data.concursos_adjudicados.length,
-      total_direct_adjustments: data.ajustes_diretos.length,
-      total_direct_adjustments_value: totalDirectAdjustmentsValue,
-      growth_rates: {
-        open_tenders: calculateGrowthRate(currentMonthCounts.open, previousMonthCounts.open),
-        awarded_tenders: calculateGrowthRate(currentMonthCounts.awarded, previousMonthCounts.awarded),
-        direct_adjustments: calculateGrowthRate(currentMonthCounts.direct, previousMonthCounts.direct)
+    meta: {
+      generated_at: new Date().toISOString(),
+      current_date: formattedDate,
+      data_source: {
+        total_tenders_analyzed: data.concursos_abertos.length
       }
     },
+    primary_metrics: {
+      total_open_tenders: data.concursos_abertos.length,
+      growth_rates: {
+        open_tenders: calculateGrowthRate(currentMonthCounts.open, previousMonthCounts.open)
+      },
+      upcoming_tenders: calculateUpcomingTenders(data.concursos_abertos)
+    },
     secondary_metrics: {
-      unique_entities: new Set([
-        ...data.concursos_abertos.map(t => t.ugea),
-        ...data.concursos_adjudicados.map(t => t.ugea),
-        ...data.ajustes_diretos.map(t => t.ugea)
-      ]).size,
+      unique_entities: new Set(data.concursos_abertos.map(t => t.ugea)).size,
       unique_provinces: new Set(data.concursos_abertos.map(t => t.provincia)).size,
-      average_direct_adjustment_value: averageDirectAdjustmentValue,
-      average_days_until_opening: calculateAverageDaysUntilOpening(data.concursos_abertos)
+      average_days_until_opening: calculateAverageDaysUntilOpening(data.concursos_abertos),
+      time_to_opening_distribution: calculateTimeToOpeningDistribution(data.concursos_abertos)
     },
     distribution_metrics: {
       province_distribution: calculateProvinceDistribution(data.concursos_abertos),
-      tender_type_distribution: calculateTenderTypeDistribution(data.concursos_abertos),
-      value_distribution: calculateValueDistribution(data.ajustes_diretos)
+      tender_type_distribution: calculateTenderTypeDistribution(data.concursos_abertos)
     },
     time_based_analytics: {
-      monthly_trends: calculateMonthlyTrends(data)
+      monthly_trends: calculateMonthlyTrends(data),
+      tender_types_trend: calculateTenderTypesTrend(data.concursos_abertos)
     },
     entity_analytics: {
       top_entities: calculateTopEntities(data)
     },
-    recent_activity: {
-      recent_awards: data.concursos_adjudicados
-        .sort((a, b) => new Date(b.data_adjudicacao) - new Date(a.data_adjudicacao))
-        .slice(0, 5)
+    geographical_insights: calculateGeographicalInsights(data.concursos_abertos),
+    content_analytics: {
+      common_keywords: extractCommonKeywords(data.concursos_abertos)
     },
+    recent_tenders: getRecentTenders(data.concursos_abertos),
     period_comparisons: {
       current_month: currentMonthCounts,
       previous_month: previousMonthCounts
