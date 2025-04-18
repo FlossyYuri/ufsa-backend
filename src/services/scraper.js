@@ -123,7 +123,7 @@ async function fetchConcursos() {
         ugea: $(element).find('td:nth-child(3)').text().trim(),
         provincia: $(element).find('td:nth-child(4)').text().trim(),
         data_lancamento: $(element).find('td:nth-child(5)').text().trim(),
-        data_abertura: $(element).find('td:nth-child(6)').text().trim().substring(0, 9),
+        data_abertura: $(element).find('td:nth-child(6)').text().trim().substring(0, 10),
         hora_abertura: $(element).find('td:nth-child(6)').text().trim().substring(10),
         link_detalhes: $(element).find('td:nth-child(1) a').attr('href')
       };

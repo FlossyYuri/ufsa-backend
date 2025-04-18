@@ -190,11 +190,11 @@ export function setupRoutes(app) {
         });
       }
 
-      // Validate referencia to prevent abuse (only allow alphanumeric and some special chars)
-      if (!/^[a-zA-Z0-9\-\/._\s%]+$/.test(referencia)) {
+      // Validate referencia to prevent abuse (allow a wider range of characters)
+      if (!/^[a-zA-Z0-9\-\/._\s%º°ªÀ-ÖØ-öø-ÿ&()\[\]{}#:;,]+$/.test(referencia)) {
         return res.status(400).json({
           error: 'Bad Request',
-          message: 'Invalid reference number format'
+          message: 'Invalid reference number format. Only alphanumeric characters and common symbols are allowed.'
         });
       }
 
