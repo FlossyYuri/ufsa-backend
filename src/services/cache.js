@@ -17,7 +17,6 @@ const UFSA_BASE_URL = 'https://www.ufsa.gov.mz';
 async function checkUfsaAvailability() {
   try {
     const response = await axios.get(UFSA_BASE_URL, {
-      timeout: 5000,
       validateStatus: function (status) {
         return status < 500; // Accept any status code less than 500
       }
@@ -45,12 +44,12 @@ export async function initializeCache() {
 
     // Try to update cache with fresh data
     await updateCache();
-    
+
     // Set up periodic cache updates
     setInterval(updateCache, CACHE_INTERVAL);
   } catch (error) {
     console.error('Failed to initialize cache:', error);
-    
+
     if (!cache.tenders.length && savedData) {
       // If fresh fetch fails but we have saved data, use it
       cache = {
@@ -71,7 +70,7 @@ async function updateCache() {
   try {
     // Check UFSA availability first
     const isUfsaAvailable = await checkUfsaAvailability();
-    
+
     if (!isUfsaAvailable) {
       console.log('UFSA website is not available, using persisted data');
       const savedData = await loadData();
@@ -89,7 +88,7 @@ async function updateCache() {
 
     // Only proceed with full data fetch if UFSA is available
     const newData = await fetchUfsaData();
-    
+
     // Only update if we got valid data
     if (newData && newData.dados && Object.keys(newData.dados).length > 0) {
       cache = {
@@ -98,7 +97,7 @@ async function updateCache() {
         retryAttempts: 0,
         isUsingPersistedData: false
       };
-      
+
       // Save the new data for future fallback
       await saveData(newData);
       console.log('Cache updated and saved successfully');
@@ -107,7 +106,7 @@ async function updateCache() {
     }
   } catch (error) {
     console.error('Failed to update cache:', error);
-    
+
     // Load saved data as fallback if available
     const savedData = await loadData();
     if (savedData) {
@@ -119,10 +118,10 @@ async function updateCache() {
       };
       console.log('Using persisted data due to update failure');
     }
-    
+
     // Schedule retry if under max attempts
     if (cache.retryAttempts < MAX_RETRY_ATTEMPTS) {
-      console.log(`Retry attempt ${cache.retryAttempts} of ${MAX_RETRY_ATTEMPTS} in ${RETRY_DELAY/1000} seconds`);
+      console.log(`Retry attempt ${cache.retryAttempts} of ${MAX_RETRY_ATTEMPTS} in ${RETRY_DELAY / 1000} seconds`);
       setTimeout(updateCache, RETRY_DELAY);
     } else {
       console.error('Max retry attempts reached. Will try again at next scheduled update.');

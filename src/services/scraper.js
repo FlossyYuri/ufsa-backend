@@ -19,7 +19,6 @@ const headers = {
 // Configure axios with enhanced retry logic
 const client = axios.create({
   headers,
-  timeout: 30000 // Increased timeout
 });
 
 axiosRetry(client, {
@@ -164,8 +163,6 @@ export async function fetchPdfDocument(referencia, type = 'document') {
       responseType: 'arraybuffer',
       // Don't parse the response as it's binary data
       transformResponse: [(data) => data],
-      // Increase timeout for large files
-      timeout: 60000,
       // Set headers that might help with PDF content
       headers: {
         ...headers,
